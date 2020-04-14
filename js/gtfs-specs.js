@@ -52,6 +52,29 @@ var GTFS_patterns ={
 		'shape_pt_lon':null,
 		'shape_pt_sequence':null,
 		'shape_dist_traveled':null,
+	},
+	
+	getGTFSPropertyKey: function(fileName){
+		if(fileName === "shapes.txt"){
+			return 'shape_id';
+		}
+		if(fileName === "calendar.txt"){
+			return 'service_id';
+		}
+		if(fileName === "trips.txt"){
+			return 'trip_id';
+		}
+		if(fileName === "stops.txt"){
+			return 'stop_id';
+		}
+		if(fileName === "routes.txt"){
+			return 'route_id';
+		}
+		if(fileName === "agency.txt"){
+			return 'agency_id';
+		}
+		
+		console.error("GTFS file name invalid");
 	}
 		//TODO add all properties and all possible files...
 }

@@ -4,6 +4,8 @@ var app = new Vue({
 		map: null,
 		GTFS_patterns: GTFS_patterns,
 		GTFS_DATA: {},
+		//map object to display
+		SHAPES: {},
 		editingFeature: null,
 		isLoading: false
 	},
@@ -18,15 +20,15 @@ var app = new Vue({
 		getGTFSLines: function(gtfsData){
 			return gtfsData.split(/[\r\n]+/g);
 		},
+		getGTFSPropertyKey: GTFS_patterns.getGTFSPropertyKey,
 		
-		fetchGTFSData: function(file_title, data, callback){
-			var pattern = this.GTFS_patterns[file_title];
+		fetchGTFSData: function(filename, data){
+			var pattern = this.GTFS_patterns[filename];
 			if(!pattern){
 				//console.log("non required file");
 			}else{
 				var 
-				template = null,
-				line =[];
+				template = null;
 				
 				this.forEachLines(data, function(line){
 					if(!template){
@@ -35,13 +37,11 @@ var app = new Vue({
 						line.forEach(function(elt, i){
 							template[elt] = (template.hasOwnProperty(elt) ? i : false);
 						});
-						this.GTFS_DATA[file_title] = [];
+						this.GTFS_DATA[filename] = [];
 					}else{
-						//DB.routes.push(current);
-						this.GTFS_DATA[file_title].push(line);
+						this.GTFS_DATA[filename].push(line);
 					}
 				}.bind(this));
-				callback ? callback(): false;
 			}
 		},
 		forEachLines: function (lines, fct){
@@ -63,13 +63,14 @@ var app = new Vue({
 					if (entries.length) {
 						entries.forEach(function(entry, i){
 							entry.getData(new zip.TextWriter(), function(text) {	
+								
 								// text contains the entry data as a String
 								this.fetchGTFSData(entry.filename, this.getGTFSLines(text));
+								
 								if(this.GTFS_DATA["shapes.txt"]){
 									this.displayShapes();
 									this.isLoading = false;
 								}
-								
 							}.bind(this));	
 						}.bind(this));
 					}
@@ -78,27 +79,32 @@ var app = new Vue({
 					console.log(error);
 				});
 			}.bind(this));
-			
-			
 		},
 		displayShapes: function (){
-			var 
-			shapes = {};
 			
-			this.GTFS_DATA["shapes.txt"].forEach(function(shape){
-				//["shp_3_1", "44.265293121", "0.70615625381", "1", "0"]
-				
-				if(!shapes[shape[0]]){
-					shapes[shape[0]] = {
-						    "type": "LineString",
-						    "coordinates": [],
-						    "shape_uri": shape[0]
-					};
-				}
-					
-				shapes[shape[0]].coordinates.push([parseFloat(shape[2]), parseFloat(shape[1])]);
-			});
-			shapesGeoJSON = L.geoJSON(Object.values(shapes), {
+			var 
+			data_key = "shapes.txt",
+			gtfs_shapes =this.GTFS_DATA[data_key],
+			shap_id_pos = this.GTFS_patterns[data_key]['shape_id'];
+			pt_lat_pos = this.GTFS_patterns[data_key]['shape_pt_lat'],
+			pt_lon_pos = this.GTFS_patterns[data_key]['shape_pt_lon'];
+			
+			//["shp_3_1", "44.265293121", "0.70615625381", "1", "0"]
+			gtfs_shapes.forEach(function(shape_line){
+					var shape_id = shape_line[shap_id_pos];
+					if(!this.SHAPES[shape_id]){
+						this.SHAPES[shape_id] = {
+							    "type": "LineString",
+							    "coordinates": []
+						};
+					}
+					this.SHAPES[shape_id].coordinates.push([
+						parseFloat(shape_line[pt_lon_pos]), 
+						parseFloat(shape_line[pt_lat_pos]) 
+					]);
+			}.bind(this));
+			
+			var shapesGeoJSON = L.geoJSON(Object.values(this.SHAPES), {
 			    style: {
 			        "color": "#ff7800",
 			        "weight": 5,
@@ -132,7 +138,6 @@ var app = new Vue({
 			  this.map = L.map('map', {editable: true}).setView([51.505, -0.09], 13);;
 			  L.tileLayer('https://cartodb-basemaps-{s}.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png', {
 						attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="http://cartodb.com/attributions">CartoDB</a>', maxZoom: 15}).addTo(this.map); 
-			  
 		}
 	}
 });
