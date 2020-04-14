@@ -99,6 +99,7 @@ function displayShapes(){
 	        layer.on({
 	            click: (function(f){
 	            	return function(e){
+	            		f.coordinates.map(coords => coords.reverse());
 	            		setEditableFeature(f);
 	            		$("#shapes-list").scrollTop( $("#"+f.shape_uri).offset().top);
 	            	}
@@ -128,7 +129,6 @@ function displayShapes(){
 }
 
 function setEditableFeature(f){
-	f.coordinates.map(coords => coords.reverse());
 	editingFeature ? map.removeLayer(editingFeature) : null;
 	editingFeature = L.polyline(f.coordinates).addTo(map);
 	editingFeature.enableEdit();
