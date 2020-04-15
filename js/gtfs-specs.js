@@ -41,11 +41,6 @@ var GTFS_patterns ={
 		'shape_dist_traveled':null,
 		'timepoint':null
 	},
-	"calendar.txt": {
-		'service_id':null,
-		'date':null,
-		'exception_type':null
-	},
 	"shapes.txt": {
 		'shape_id':null,
 		'shape_pt_lat':null,
@@ -54,12 +49,9 @@ var GTFS_patterns ={
 		'shape_dist_traveled':null,
 	},
 	
-	getGTFSPropertyKey: function(fileName){
+	getGTFSPropertyId: function(fileName){
 		if(fileName === "shapes.txt"){
 			return 'shape_id';
-		}
-		if(fileName === "calendar.txt"){
-			return 'service_id';
 		}
 		if(fileName === "trips.txt"){
 			return 'trip_id';
@@ -74,7 +66,6 @@ var GTFS_patterns ={
 			return 'agency_id';
 		}
 		
-		console.error("GTFS file name invalid");
+		console.log(fileName + " is an optional file for shape editing...");
 	}
-		//TODO add all properties and all possible files...
 }
