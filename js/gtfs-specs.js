@@ -30,16 +30,16 @@ var GTFS_patterns ={
 		'wheelchair_boarding':null
 	},
 	"trips.txt": {
+		'route_id':null,
+		'service_id':null,
 		'trip_id':null,
-		'arrival_time':null,
-		'departure_time':null,
-		'stop_id':null,
-		'stop_sequence':null,
-		'stop_headsign':null,
-		'pickup_type':null,
-		'drop_off_type':null,
-		'shape_dist_traveled':null,
-		'timepoint':null
+		'trip_headsign':null,
+		'trip_short_name':null,
+		'direction_id':null,
+		'block_id':null,
+		'shape_id':null,
+		'wheelchair_accessible':null,
+		'bikes_allowed':null
 	},
 	"shapes.txt": {
 		'shape_id':null,
@@ -48,7 +48,13 @@ var GTFS_patterns ={
 		'shape_pt_sequence':null,
 		'shape_dist_traveled':null,
 	},
-	
+	"stop_times.txt": {
+		'trip_id': null,
+		'arrival_time': null,
+		'departure_time': null,
+		'stop_id': null,
+		'stop_sequence': null
+	},
 	getGTFSPropertyId: function(fileName){
 		if(fileName === "shapes.txt"){
 			return 'shape_id';
@@ -65,7 +71,9 @@ var GTFS_patterns ={
 		if(fileName === "agency.txt"){
 			return 'agency_id';
 		}
-		
+		if(fileName === "stop_times.txt"){
+			return 'trip_id';
+		}
 		console.log(fileName + " is an optional file for shape editing...");
 	}
 }

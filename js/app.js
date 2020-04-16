@@ -4,35 +4,60 @@ var app = new Vue({
 		map: null,
 		GTFS_patterns: GTFS_patterns,
 		GTFS:{
-			agency:{},
-			stops:{},
-			routes:{},
-			trips:{},
-			shapes: {}
+			agency:null,
+			stops:null,
+			routes:null,
+			trips:null,
+			shapes: null,
+			stop_times:null
 		},
+		shapesByRoute: {},
 		SHAPES_LAYER: null,
 		SHAPES_FEATURE: [],
 		EDITING_OBJECT: null,
 		isLoading: false,
-		isModified: false
+		isModified: false,
+		isLoaded : false
 	},
 	mounted: function(){
 		this.initMap();
 	},
 	computed: {
 		editingShape: function(){
-			return this.EDITING_OBJECT ? this.EDITING_OBJECT.feature.shape_uri : null;
+			return this.EDITING_OBJECT ? this.EDITING_OBJECT.feature.shape_id : null;
 		}
 	},
+	watch: {
+	},
 	methods: {
+		HTMLcolor: function(route_id){
+			return {
+				"background-color": this.routeColor(route_id),
+				"color": "#"+(this.GTFS.routes[route_id].route_text_color ? this.GTFS.routes[route_id].route_text_color : "black")
+			}
+		},
+		routeColor: function(route_id){
+			return "#"+(this.GTFS.routes[route_id].route_color ? this.GTFS.routes[route_id].route_color : "white");
+		},
+		shapeColor: function(shape_id){
+			for(var route_id in this.shapesByRoute){
+				if(this.shapesByRoute.hasOwnProperty(route_id)){
+					var index = this.shapesByRoute[route_id].indexOf(shape_id);
+					if(index === -1){
+						return "#"+(this.GTFS.routes[route_id].route_color ? this.GTFS.routes[route_id].route_color : "white");
+					}
+				}
+			}
+		},
+		buildGeoJson: buildGeoJson,
 		updateShapes: updateShapes,
 		displayShapes: displayShapes,
 		setEditingObject: setEditingObject,
 		initMap: initMap,
+		findFeatureIndex: findFeatureIndex,
 		getGTFSLines: function(gtfsData){
 			return gtfsData.split(/[\r\n]+/g);
 		},
-		
 		getGTFSPropertyId: GTFS_patterns.getGTFSPropertyId,
 		fetchGTFSData: function(filename, data){
 			var 
@@ -90,8 +115,27 @@ var app = new Vue({
 							entry.getData(new zip.TextWriter(), function(text) {	
 								// text contains the entry data as a String
 								this.fetchGTFSData(entry.filename, this.getGTFSLines(text));
-
-								this.isLoading = false;
+								if(this.GTFS.routes && this.GTFS.stops && this.GTFS.trips && this.GTFS.shapes){
+									for(var trip_id in this.GTFS.trips){
+										if(this.GTFS.trips.hasOwnProperty(trip_id)){
+											var 
+											route_id = this.GTFS.trips[trip_id].route_id,
+											shape_id = this.GTFS.trips[trip_id].shape_id;
+											
+											if(!this.shapesByRoute[route_id]){
+												this.shapesByRoute[route_id] = [];
+											}
+											
+											var index = this.shapesByRoute[route_id].indexOf(shape_id);
+											if(index === -1){
+												this.shapesByRoute[route_id].push(shape_id);
+											}
+										}
+									}
+									this.displayShapes();
+									this.isLoading = false;	
+									this.isLoaded = true;
+								}
 							}.bind(this));	
 						}.bind(this));
 					}
@@ -101,5 +145,25 @@ var app = new Vue({
 				});
 			}.bind(this));
 		},
+		exportGTFSZip: function(){
+			// use a BlobWriter to store the zip into a Blob object
+			zip.createWriter(new zip.BlobWriter(), function(writer) {
+			
+			  // use a TextReader to read the String to add
+			  writer.add("filename.txt", new zip.TextReader("test!"), function() {
+			    // onsuccess callback
+
+			    // close the zip writer
+			    writer.close(function(blob) {
+			      // blob contains the zip file as a Blob object
+
+			    });
+			  }, function(currentIndex, totalIndex) {
+			    // onprogress callback
+			  });
+			}, function(error) {
+			  // onerror callback
+			});
+		}
 	}
 });
