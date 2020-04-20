@@ -1,3 +1,4 @@
+
 var app = new Vue({
 	el: '#app',
 	data: {
@@ -11,10 +12,18 @@ var app = new Vue({
 			shapes: null,
 			stop_times:null
 		},
+		//TODO create an object to use relations
 		shapesByRoute: {},
+		stopsByRoute: {},
+		
+		//map
 		SHAPES_LAYER: null,
 		SHAPES_FEATURE: [],
+		STOPS_LAYER: null,
+		STOPS_FEATURE: [],
 		EDITING_OBJECT: null,
+		
+		//states
 		isLoading: false,
 		isModified: false,
 		isLoaded : false
@@ -50,8 +59,10 @@ var app = new Vue({
 			}
 		},
 		buildGeoJson: buildGeoJson,
+		buildGTFS: buildGTFS,
 		updateShapes: updateShapes,
 		displayShapes: displayShapes,
+		updateStops: updateStops,
 		setEditingObject: setEditingObject,
 		initMap: initMap,
 		findFeatureIndex: findFeatureIndex,
@@ -59,7 +70,7 @@ var app = new Vue({
 			return gtfsData.split(/[\r\n]+/g);
 		},
 		getGTFSPropertyId: GTFS_patterns.getGTFSPropertyId,
-		fetchGTFSData: function(filename, data){
+		fetchGTFSData: function(filename, data, callback){
 			var 
 			pattern = this.GTFS_patterns[filename],
 			gtfs_property = filename.slice(0,filename.indexOf(".")),
@@ -101,10 +112,10 @@ var app = new Vue({
 				fct(lines[i].split(','));
 			}
 		},
-		uploadFiles: function(e){
+		imporGTFSZip: function(e){
 			let droppedFiles = e.dataTransfer.files;
 			if(!droppedFiles) return;
-			zip.workerScriptsPath = './js/zip/';
+			zip.workerScriptsPath = './js/libs/zip/';
 			// use a BlobReader to read the zip from a Blob object
 			zip.createReader(new zip.BlobReader(e.dataTransfer.files[0]), function(reader) {
 				// get all entries from the zip
@@ -115,24 +126,35 @@ var app = new Vue({
 							entry.getData(new zip.TextWriter(), function(text) {	
 								// text contains the entry data as a String
 								this.fetchGTFSData(entry.filename, this.getGTFSLines(text));
-								if(this.GTFS.routes && this.GTFS.stops && this.GTFS.trips && this.GTFS.shapes){
+								if(this.GTFS.routes && this.GTFS.stops && this.GTFS.trips && this.GTFS.shapes && this.GTFS.stop_times){
 									for(var trip_id in this.GTFS.trips){
 										if(this.GTFS.trips.hasOwnProperty(trip_id)){
-											var 
-											route_id = this.GTFS.trips[trip_id].route_id,
-											shape_id = this.GTFS.trips[trip_id].shape_id;
+											var trip = this.GTFS.trips[trip_id],
+											route_id = trip.route_id,
+											shape_id = trip.shape_id;
 											
 											if(!this.shapesByRoute[route_id]){
 												this.shapesByRoute[route_id] = [];
 											}
-											
 											var index = this.shapesByRoute[route_id].indexOf(shape_id);
 											if(index === -1){
 												this.shapesByRoute[route_id].push(shape_id);
 											}
+											if(this.GTFS.stop_times[trip_id]){
+												if(!this.stopsByRoute[route_id]){
+													this.stopsByRoute[route_id] = [];
+												}
+												
+												this.GTFS.stop_times[trip_id].forEach(function(stop_time){
+													var index = this.stopsByRoute[route_id].indexOf(stop_time.stop_id);
+													if(index === -1){
+														this.stopsByRoute[route_id].push(stop_time.stop_id);
+													}
+												}.bind(this));
+											}
 										}
 									}
-									this.displayShapes();
+									this.updateShapes();
 									this.isLoading = false;	
 									this.isLoaded = true;
 								}
@@ -146,23 +168,20 @@ var app = new Vue({
 			}.bind(this));
 		},
 		exportGTFSZip: function(){
-			// use a BlobWriter to store the zip into a Blob object
-			zip.createWriter(new zip.BlobWriter(), function(writer) {
+			var 
+			zip_ = new JSZip(),
+			builtGTFS = this.buildGTFS(this.GTFS);
 			
-			  // use a TextReader to read the String to add
-			  writer.add("filename.txt", new zip.TextReader("test!"), function() {
-			    // onsuccess callback
-
-			    // close the zip writer
-			    writer.close(function(blob) {
-			      // blob contains the zip file as a Blob object
-
-			    });
-			  }, function(currentIndex, totalIndex) {
-			    // onprogress callback
-			  });
-			}, function(error) {
-			  // onerror callback
+			for(var property in builtGTFS){
+				if(builtGTFS.hasOwnProperty(property)){
+					zip_.file(property+".txt", builtGTFS[property]);
+				}
+			}
+			// Generate the zip file asynchronously
+			zip_.generateAsync({type:"blob"})
+			.then(function(content) {
+			    // Force down of the Zip file
+			    saveAs(content, "gtfs.zip");
 			});
 		}
 	}

@@ -1,8 +1,8 @@
-function displayShapes(shapes, route_id){
+function updateShapes(shapes, route_id){
 	//TODO test if scope is not already displayed, for new we always reset map
 	this.SHAPES_FEATURE = [];
 	for(var shape_id in this.GTFS.shapes){
-		if(this.GTFS.shapes.hasOwnProperty(shape_id) && (shapes ? shapes.indexOf(shape_id) > -1 : true)){
+		if(this.GTFS.shapes.hasOwnProperty(shape_id) && (shapes ? shapes.indexOf(shape_id) > -1 : true)){ 
 			var t = this.buildGeoJson(shape_id, route_id);
 			this.GTFS.shapes[shape_id].forEach(function(shape_entry){
 				t.coordinates.push([parseFloat(shape_entry['shape_pt_lon']), parseFloat(shape_entry['shape_pt_lat'])]);
@@ -10,7 +10,39 @@ function displayShapes(shapes, route_id){
 			this.SHAPES_FEATURE.push(t);
 		}
 	}
-	this.updateShapes();
+	this.displayShapes();
+}
+function updateStops(route_id){
+	this.STOPS_LAYER ? this.map.removeLayer(this.STOPS_LAYER):null;
+	this.STOPS_FEATURE = [];
+	
+	//TODO display stops when no route scope ? 
+	if(route_id){
+		this.stopsByRoute[route_id].forEach(function(stop_id){
+			var 
+			stop = this.GTFS.stops[stop_id],
+			station = stop.parent_station ? this.GTFS.stops[stop.parent_station] : null;
+			
+			if(station){
+				var station = this.GTFS.stops[stop.parent_station]
+				this.STOPS_FEATURE.push({
+					"type": "Point",
+					"coordinates": [station.stop_lon, station.stop_lat],
+					"stop_id": station.stop_id
+				});
+			}
+			
+			this.STOPS_FEATURE.push({
+				"type": "Point",
+				"coordinates": [stop.stop_lon, stop.stop_lat],
+				"stop_id": stop_id
+			});
+		}.bind(this));
+	}
+	if(this.STOPS_FEATURE.length > 0){
+		this.STOPS_LAYER = L.geoJSON(this.STOPS_FEATURE);
+		this.STOPS_LAYER.addTo(this.map);
+	}
 }
 //FIXME pass color here ? 
 function buildGeoJson(shape_id, route_id){
@@ -25,7 +57,7 @@ function buildGeoJson(shape_id, route_id){
 		 "shape_id" : shape_id
 	};
 }
-function updateShapes(){
+function displayShapes(){
 	this.SHAPES_LAYER ? this.map.removeLayer(this.SHAPES_LAYER):null;
 	this.SHAPES_LAYER = L.geoJSON(this.SHAPES_FEATURE,{style: function(feature) {
         	return {
@@ -61,7 +93,7 @@ function setEditingObject(shape_id, route_id){
 				"shape_id": this.EDITING_OBJECT.feature.shape_id,
 				"shape_pt_lon":latLng.lng,//FIXME create String ? 
 				"shape_pt_lat":latLng.lat,//FIXME create String ? 
-				"shape_pt_sequence": i //FIXME create String ? 
+				"shape_pt_sequence":i //FIXME create String ? 
 			};
 		}.bind(this));
 	}
@@ -69,15 +101,18 @@ function setEditingObject(shape_id, route_id){
 	this.EDITING_OBJECT && this.EDITING_OBJECT.layer ? this.map.removeLayer(this.EDITING_OBJECT.layer):null;
 	//display route scope
 	if(route_id){
-		this.displayShapes(this.shapesByRoute[route_id], route_id);
+		this.updateShapes(this.shapesByRoute[route_id], route_id);
+		this.updateStops(route_id);
 	}else{
 		//no route is all route
-		this.displayShapes();
+		this.updateShapes();
+		this.updateStops();
 	}
 	//check if shape to edit
 	if(shape_id){
 		const index = this.findFeatureIndex(shape_id);
-		//update editing object
+		
+		//update editing object FIXME when there is only one modfication... we retrun inverted shape (modified one)
 		this.EDITING_OBJECT = {
 			layer: L.polyline(this.SHAPES_FEATURE[index].coordinates.map(function(coords){
 				return [coords[1], coords[0]];
