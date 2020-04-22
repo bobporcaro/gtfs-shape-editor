@@ -21,7 +21,7 @@
 	</head>
 	<body>
 		<div id="app" v-cloak @drop.prevent="imporGTFSZip" @dragover.prevent>
-		<header><h1>GTFS shape editor</h1><div class="loader" v-bind:class="{ hidden: !isLoading }"></div></header>
+		<header><h1>GTFS shape editor</h1><div class="loader" v-bind:class="{ hidden: !isLoading }"></div><div class="force-shapes" v-bind:class="{ hidden: !isLoaded }" v-on:click="forceGTFS()">Force shapes to  be near stops</div></header>
 		<section id="mapContainer">
 			<div id="map"></div>
 			<div class="map-content" v-bind:class="{ hidden: !isLoaded }">
@@ -32,7 +32,7 @@
   						<ul><li v-for="shape_id in shapes" v-on:click="setEditingObject(shape_id, route_id)" v-bind:class="{ active: (shape_id === editingShape) }">{{shape_id}}</li></ul>
   					</li>
  				</ul>
-				<button v-on:click="exportGTFSZip" v-bind:class="{ hidden: !isModified }">Export new GTFS</button>
+				<button v-on:click="exportGTFSZip" >Export new GTFS</button>
 			</div>
 		</section>
 		</div>

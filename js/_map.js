@@ -3,7 +3,7 @@ function updateShapes(shapes, route_id){
 	this.SHAPES_FEATURE = [];
 	for(var shape_id in this.GTFS.shapes){
 		if(this.GTFS.shapes.hasOwnProperty(shape_id) && (shapes ? shapes.indexOf(shape_id) > -1 : true)){ 
-			var t = this.buildGeoJson(shape_id, route_id);
+			var t = this.buildGeoJsonShape(shape_id, route_id);
 			this.GTFS.shapes[shape_id].forEach(function(shape_entry){
 				t.coordinates.push([parseFloat(shape_entry['shape_pt_lon']), parseFloat(shape_entry['shape_pt_lat'])]);
 			});
@@ -12,40 +12,39 @@ function updateShapes(shapes, route_id){
 	}
 	this.displayShapes();
 }
-function updateStops(route_id){
+function updateStops(shape_id){
 	this.STOPS_LAYER ? this.map.removeLayer(this.STOPS_LAYER):null;
 	this.STOPS_FEATURE = [];
 	
-	//TODO display stops when no route scope ? 
-	if(route_id){
-		this.stopsByRoute[route_id].forEach(function(stop_id){
+	if(shape_id){
+		this.stopsByShape[shape_id].forEach(function(stop_id){
 			var 
 			stop = this.GTFS.stops[stop_id],
 			station = stop.parent_station ? this.GTFS.stops[stop.parent_station] : null;
 			
 			if(station){
 				var station = this.GTFS.stops[stop.parent_station]
-				this.STOPS_FEATURE.push({
-					"type": "Point",
-					"coordinates": [station.stop_lon, station.stop_lat],
-					"stop_id": station.stop_id
-				});
+				this.STOPS_FEATURE.push(this.buildGeoJsonStop(station, true));
 			}
-			
-			this.STOPS_FEATURE.push({
-				"type": "Point",
-				"coordinates": [stop.stop_lon, stop.stop_lat],
-				"stop_id": stop_id
-			});
+			this.STOPS_FEATURE.push(this.buildGeoJsonStop(stop, false));
 		}.bind(this));
 	}
 	if(this.STOPS_FEATURE.length > 0){
-		this.STOPS_LAYER = L.geoJSON(this.STOPS_FEATURE);
+		this.STOPS_LAYER = L.geoJSON(this.STOPS_FEATURE,{ onEachFeature: function(feature, layer) {
+			
+			var greenIcon = L.icon({
+			    iconUrl: feature.station ? 'Location-Marker-50.png' : 'Maps-50.png',
+			    iconAnchor:   [25, 50], // point of the icon which will correspond to marker's location
+			    popupAnchor:  [0, -50] // point from which the popup should open relative to the iconAnchor
+			});
+			layer.bindPopup((feature.station ? "Station: ":"")+this.GTFS.stops[feature.stop_id].stop_name + " - " + this.GTFS.stops[feature.stop_id].stop_id);
+			layer.options.icon = greenIcon;
+		}.bind(this)});
 		this.STOPS_LAYER.addTo(this.map);
 	}
 }
 //FIXME pass color here ? 
-function buildGeoJson(shape_id, route_id){
+function buildGeoJsonShape(shape_id, route_id){
 	return {
 		 "type": "LineString",
 		 "coordinates": [],
@@ -57,6 +56,16 @@ function buildGeoJson(shape_id, route_id){
 		 "shape_id" : shape_id
 	};
 }
+
+function buildGeoJsonStop(stop, isStation){
+	return {
+		"type": "Point",
+		"coordinates": [stop.stop_lon, stop.stop_lat],
+		"station": isStation,
+		"stop_id": stop.stop_id
+	}
+}
+
 function displayShapes(){
 	this.SHAPES_LAYER ? this.map.removeLayer(this.SHAPES_LAYER):null;
 	this.SHAPES_LAYER = L.geoJSON(this.SHAPES_FEATURE,{style: function(feature) {
@@ -85,33 +94,42 @@ function findFeatureIndex(shape_id){
 		return f.shape_id === shape_id
 	}.bind(this));
 }
+
+function routeColor(route_id){
+	return "#"+(this.GTFS.routes[route_id].route_color ? this.GTFS.routes[route_id].route_color : "white");
+}
+function shapeColor(shape_id){
+	for(var route_id in this.shapesByRoute){
+		if(this.shapesByRoute.hasOwnProperty(route_id)){
+			var index = this.shapesByRoute[route_id].indexOf(shape_id);
+			if(index === -1){
+				return "#"+(this.GTFS.routes[route_id].route_color ? this.GTFS.routes[route_id].route_color : "white");
+			}
+		}
+	}
+}
+
 function setEditingObject(shape_id, route_id){
 	//save modifs
-	if(this.EDITING_OBJECT && this.isModified){
+	if(this.EDITING_OBJECT){
 		this.GTFS.shapes[this.EDITING_OBJECT.feature.shape_id] = this.EDITING_OBJECT.layer.getLatLngs().map(function(latLng, i){
 			return {
 				"shape_id": this.EDITING_OBJECT.feature.shape_id,
-				"shape_pt_lon":latLng.lng,//FIXME create String ? 
 				"shape_pt_lat":latLng.lat,//FIXME create String ? 
-				"shape_pt_sequence":i //FIXME create String ? 
+				"shape_pt_lon":latLng.lng,//FIXME create String ? 
+				"shape_pt_sequence":i, //FIXME create String ?,
+				"shape_dist_traveled":null
 			};
 		}.bind(this));
+		this.map.removeLayer(this.EDITING_OBJECT.layer);
 	}
-	//remove to update
-	this.EDITING_OBJECT && this.EDITING_OBJECT.layer ? this.map.removeLayer(this.EDITING_OBJECT.layer):null;
-	//display route scope
-	if(route_id){
-		this.updateShapes(this.shapesByRoute[route_id], route_id);
-		this.updateStops(route_id);
-	}else{
-		//no route is all route
-		this.updateShapes();
-		this.updateStops();
-	}
+		
+	this.updateShapes(route_id ? this.shapesByRoute[route_id]:null, route_id);
+	this.updateStops(shape_id);
+	
 	//check if shape to edit
 	if(shape_id){
 		const index = this.findFeatureIndex(shape_id);
-		
 		//update editing object FIXME when there is only one modfication... we retrun inverted shape (modified one)
 		this.EDITING_OBJECT = {
 			layer: L.polyline(this.SHAPES_FEATURE[index].coordinates.map(function(coords){
@@ -121,16 +139,9 @@ function setEditingObject(shape_id, route_id){
 		};
 		this.EDITING_OBJECT.layer.enableEdit();
 		this.map.fitBounds(this.EDITING_OBJECT.layer.getBounds());
-	}else{
-		//nothing to edit
-		this.EDITING_OBJECT = null;
 	}
 }
 function initMap(){
 	this.map = L.map('map', {editable: true}).setView([51.505, -0.09], 13);
 	L.tileLayer('https://cartodb-basemaps-{s}.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png', {attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="http://cartodb.com/attributions">CartoDB</a>'}).addTo(this.map); 
-	
-	this.map.on('editable:editing', function(e){
-		this.isModified = true;
-	}.bind(this));
 }

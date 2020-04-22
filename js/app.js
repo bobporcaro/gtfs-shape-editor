@@ -14,7 +14,7 @@ var app = new Vue({
 		},
 		//TODO create an object to use relations
 		shapesByRoute: {},
-		stopsByRoute: {},
+		stopsByShape: {},
 		
 		//map
 		SHAPES_LAYER: null,
@@ -25,7 +25,6 @@ var app = new Vue({
 		
 		//states
 		isLoading: false,
-		isModified: false,
 		isLoaded : false
 	},
 	mounted: function(){
@@ -37,81 +36,45 @@ var app = new Vue({
 		}
 	},
 	watch: {
+		'GTFS.shapes': {
+			deep: true,
+			 handler: function (val, oldVal) { 
+			 }
+		}
 	},
 	methods: {
+		forceGTFS: function(){
+			this.isLoading = true;
+			
+			setTimeout(function(){
+				forceNearests(this.GTFS);
+				this.updateShapes();
+				this.updateStops();
+				this.isLoading = false;
+				this.isModified = true;	
+			}.bind(this), 1);
+		},
 		HTMLcolor: function(route_id){
 			return {
 				"background-color": this.routeColor(route_id),
 				"color": "#"+(this.GTFS.routes[route_id].route_text_color ? this.GTFS.routes[route_id].route_text_color : "black")
 			}
 		},
-		routeColor: function(route_id){
-			return "#"+(this.GTFS.routes[route_id].route_color ? this.GTFS.routes[route_id].route_color : "white");
-		},
-		shapeColor: function(shape_id){
-			for(var route_id in this.shapesByRoute){
-				if(this.shapesByRoute.hasOwnProperty(route_id)){
-					var index = this.shapesByRoute[route_id].indexOf(shape_id);
-					if(index === -1){
-						return "#"+(this.GTFS.routes[route_id].route_color ? this.GTFS.routes[route_id].route_color : "white");
-					}
-				}
-			}
-		},
-		buildGeoJson: buildGeoJson,
 		buildGTFS: buildGTFS,
+		routeColor: routeColor,
+		shapeColor: shapeColor,
 		updateShapes: updateShapes,
 		displayShapes: displayShapes,
+		buildGeoJsonStop: buildGeoJsonStop,
+		buildGeoJsonShape:buildGeoJsonShape,
 		updateStops: updateStops,
 		setEditingObject: setEditingObject,
 		initMap: initMap,
 		findFeatureIndex: findFeatureIndex,
-		getGTFSLines: function(gtfsData){
-			return gtfsData.split(/[\r\n]+/g);
-		},
+		getGTFSLines: getGTFSLines,
 		getGTFSPropertyId: GTFS_patterns.getGTFSPropertyId,
-		fetchGTFSData: function(filename, data, callback){
-			var 
-			pattern = this.GTFS_patterns[filename],
-			gtfs_property = filename.slice(0,filename.indexOf(".")),
-			id = this.getGTFSPropertyId(filename);
-			
-			if(pattern){
-				var 
-				template = null;
-				
-				this.forEachLines(data, function(line){
-					if(!template){
-						template = pattern; 
-						line.forEach(function(elt, i){
-							template[elt] = (template.hasOwnProperty(elt) ? i : false);
-						});
-						this.GTFS[gtfs_property] = {};
-					}else{
-						var entry = {};
-						for(var key in template){
-							if(template.hasOwnProperty(key)){
-								entry[key] = line[template[key]];
-							}
-						}
-						if(this.GTFS[gtfs_property][entry[id]]){
-							if(!Array.isArray(this.GTFS[gtfs_property][entry[id]])){
-								//array if several datas for same entries (shapes...)
-								this.GTFS[gtfs_property][entry[id]] = [this.GTFS[gtfs_property][entry[id]]];
-							}
-							this.GTFS[gtfs_property][entry[id]].push(entry);
-						}else{
-							this.GTFS[gtfs_property][entry[id]] = entry;
-						}
-					}
-				}.bind(this));
-			}
-		},
-		forEachLines: function (lines, fct){
-			for(var i = 0 ; i < lines.length -1; i++) {
-				fct(lines[i].split(','));
-			}
-		},
+		fetchGTFSData: fetchGTFSData,
+		forEachLines: forEachLines,
 		imporGTFSZip: function(e){
 			let droppedFiles = e.dataTransfer.files;
 			if(!droppedFiles) return;
@@ -141,14 +104,14 @@ var app = new Vue({
 												this.shapesByRoute[route_id].push(shape_id);
 											}
 											if(this.GTFS.stop_times[trip_id]){
-												if(!this.stopsByRoute[route_id]){
-													this.stopsByRoute[route_id] = [];
+												if(!this.stopsByShape[shape_id]){
+													this.stopsByShape[shape_id] = [];
 												}
 												
 												this.GTFS.stop_times[trip_id].forEach(function(stop_time){
-													var index = this.stopsByRoute[route_id].indexOf(stop_time.stop_id);
+													var index = this.stopsByShape[shape_id].indexOf(stop_time.stop_id);
 													if(index === -1){
-														this.stopsByRoute[route_id].push(stop_time.stop_id);
+														this.stopsByShape[shape_id].push(stop_time.stop_id);
 													}
 												}.bind(this));
 											}
